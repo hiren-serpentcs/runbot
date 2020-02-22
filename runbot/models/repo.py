@@ -697,13 +697,19 @@ class runbot_repo(models.Model):
         except Exception as e:
             self.env.cr.rollback()
             self.env.clear()
-            _logger.exception(e)
-            message = str(e)
-            if host.last_exception == message:
-                host.exception_count += 1
+            if type(e) == subprocess.CalledProcessError and ['fetch', '-p', 'origin'] in e.cmd:
+                message = 'Failed to fetch repo %s with return code %s. Original command was %s' % (repo.name, e.returncode, e.cmd)
+                _logger.exception(message)
+                host.last_exception = message
+                host.assigned_only = True
             else:
-                host.last_exception = str(e)
-                host.exception_count = 1
+                _logger.exception(e)
+                message = str(e)
+                if host.last_exception == message:
+                    host.exception_count += 1
+                else:
+                    host.last_exception = str(e)
+                    host.exception_count = 1
             self._commit()
             return random.uniform(0, 3)
         else:
